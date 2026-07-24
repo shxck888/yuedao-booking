@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月島文字燒 - 訂位管理</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="config.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #fff7ed 0%, #fdba74 100%);
+            min-height: 100vh;
+            padding: 1.25rem;
+            padding-bottom: 2rem;
+        }
+
+        .container { max-width: 520px; margin: 0 auto; }
+
+        /* 訂位卡片樣式 */
+        .order-card {
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(124, 45, 18, 0.06);
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .info-row { display: flex; align-items: center; margin-bottom: 0.6rem; font-size: 1.1rem; white-space: nowrap; }
+        .info-label { width: 100px; flex-shrink: 0; color: #9a7b66; font-weight: 500; }
+        .info-value { color: #431407; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 狀態標籤 */
+        .status-badge { padding: 0.3rem 0.8rem; border-radius: 9999px; font-size: 0.9rem; font-weight: 700; }
+        .status-待確認 { background: #fef3c7; color: #92400e; }
+        .status-已確認 { background: #dcfce7; color: #166534; }
+        .status-已取消 { background: #fee2e2; color: #991b1b; }
+
+        /* 按鈕樣式 */
+        .btn-action { flex: 1; padding: 0.85rem; border-radius: 0.75rem; font-weight: 700; font-size: 1rem; text-align: center; transition: 0.2s; border: 1px solid #fed7aa; }
+        .btn-edit { background: #fff7ed; color: #9a3412; }
+        .btn-edit:active { transform: scale(0.95); background: #ffedd5; }
+
+        /* Modal 彈窗 */
+        #custom-modal {
+            position: fixed; inset: 0;
+            background: rgba(67, 20, 7, 0.55);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center; justify-content: center;
+            z-index: 200;
+            padding: 1.5rem;
+        }
+        .modal-content {
+            background: white;
+            width: 100%; max-width: 400px;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 20px 50px rgba(67,20,7,0.3);
+            transform: translateY(0);
+            animation: modalIn 0.3s ease-out;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #loading-screen { position: fixed; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; }
+        .spinner { border: 4px solid #ffedd5; border-top: 4px solid #f97316; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 載入中 -->
+    <div id="loading-screen"><div class="spinner"></div><p class="mt-4 text-orange-800/60 font-bold text-lg">讀取資料中...</p></div>
+
+    <!-- 彈窗 (整合修改與取消) -->
+    <div id="custom-modal">
+        <div class="modal-content">
+            <h3 id="modal-title" class="text-xl font-black text-orange-900 mb-2">標題</h3>
+            <p id="modal-desc" class="text-base text-orange-800/60 mb-5">描述文字</p>
+            <div id="modal-input-container">
+                <input type="text" id="modal-input-text" class="w-full p-4 text-lg border border-orange-200 rounded-xl mb-6 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            <div class="flex gap-4">
+                <button onclick="closeModal()" class="flex-1 py-4 bg-orange-50 text-orange-800/70 font-bold rounded-xl text-lg">取消</button>
+                <button id="modal-confirm" class="flex-1 py-4 bg-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-100 text-lg">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header text-center mb-8 pt-6">
+            <h2 class="text-3xl font-black text-orange-900 tracking-tight">我的訂位管理</h2>
+            <p class="text-orange-500 font-bold tracking-[0.3em] text-xs uppercase mt-2">月島文字燒</p>
+        </div>
+
+        <div id="order-list" class="space-y-5"></div>
+
+        <div id="no-data" class="hidden text-center py-24 bg-white/50 rounded-3xl border-2 border-dashed border-orange-300">
+            <p class="text-orange-800/40 font-bold text-lg">目前無訂位紀錄</p>
+            <button onclick="fetchOrders()" class="mt-6 px-8 py-3 bg-orange-500 text-white rounded-full text-sm font-bold shadow-lg shadow-orange-200">重新整理</button>
+        </div>
+    </div>
+
+    <script>
+        const GAS_URL = window.CONFIG.GAS_URL;
+        const LIFF_ID = window.CONFIG.LIFF_ID_MANAGE;
+        const STORE_NAME = window.CONFIG.STORE_NAME;
+        let currentUserId = "";
+
+        // 初始化 LIFF
+        async function init() {
+            try {
+                if (window.location.hostname === "localhost" || !navigator.userAgent.includes("Line")) {
+                    currentUserId = "U267b4a5f71f34a200282ce93a363c3b7";
+                    fetchOrders();
+                } else {
+                    await liff.init({ liffId: LIFF_ID });
+                    if (!liff.isLoggedIn()) { liff.login(); return; }
+                    const profile = await liff.getProfile();
+                    currentUserId = profile.userId;
+                    fetchOrders();
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        // 讀取訂單
+        async function fetchOrders() {
+            document.getElementById('loading-screen').style.display = 'flex';
+            try {
+                const response = await fetch(`${GAS_URL}?action=query&lineId=${currentUserId}&t=${Date.now()}`);
+                const result = await response.json();
+                document.getElementById('loading-screen').style.display = 'none';
+
+                let orders = (result.status === 'success' && Array.isArray(result.data)) ? result.data : [];
+
+                // 與海之星共用同一套後端：若後端有回傳 store 欄位，只顯示月島的訂位；
+                // 若舊資料沒有 store 欄位，則一併顯示（避免漏單）。
+                orders = orders.filter(o => !o.store || o.store === STORE_NAME);
+
+                if (orders.length > 0) {
+                    renderOrders(orders);
+                    document.getElementById('no-data').classList.add('hidden');
+                } else {
+                    document.getElementById('order-list').innerHTML = '';
+                    document.getElementById('no-data').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Fetch Error:", err);
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('no-data').classList.remove('hidden');
+            }
+        }
+
+        // 渲染卡片
+        function renderOrders(orders) {
+            const listDiv = document.getElementById('order-list');
+            listDiv.innerHTML = '';
+            orders.forEach(order => {
+                const card = document.createElement('div');
+                card.className = 'order-card';
+
+                const typeDisplay = order.type === "套餐吃到飽" ? `套餐吃到飽 (${order.price || order.tableValue || ''})` : order.type;
+                const isClosed = order.status === "已取消";
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-5 pb-3 border-b border-orange-100">
+                        <div class="info-row !mb-0">
+                            <span class="info-label !w-auto mr-2 text-sm">訂單編號</span>
+                            <span class="info-value text-orange-600 font-mono text-xl tracking-tighter">${order.id}</span>
+                        </div>
+                        <span class="status-badge status-${order.status}">${order.status}</span>
+                    </div>
+
+                    <div class="space-y-2 bg-orange-50/60 p-4 rounded-2xl mb-5">
+                        <div class="info-row"><span class="info-label">訂桌大名</span><span class="info-value text-xl">${order.name}</span></div>
+                        <div class="info-row"><span class="info-label">訂桌電話</span><span class="info-value">${order.phone}</span></div>
+                        <div class="info-row"><span class="info-label">訂桌時間</span><span class="info-value text-amber-600">${order.date} ${order.time}</span></div>
+                        <div class="info-row"><span class="info-label">訂位人數</span><span class="info-value">${order.people} 人</span></div>
+                        <div class="info-row items-start whitespace-normal">
+                            <span class="info-label">備註</span>
+                            <span class="info-value">${order.note || '無'}</span>
+                        </div>
+                    </div>
+
+                    ${isClosed ? `
+                        <div class="text-center py-2 text-orange-800/40 italic">- 此訂位已取消 -</div>
+                    ` : `
+                        <div class="flex gap-3">
+                            <button onclick="handleEditNote('${order.id}', '${(order.note || '').replace(/'/g, "\\'")}')" class="btn-action btn-edit">修改備註</button>
+                            <button onclick="handleCancel('${order.id}')" class="btn-action btn-edit">取消訂位</button>
+                        </div>
+                    `}
+                `;
+                listDiv.appendChild(card);
+            });
+        }
+
+        /**
+         * 統一彈窗邏輯
+         */
+        function showModal({ title, desc, defaultValue, hideInput, onConfirm }) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc || "";
+
+            const inputContainer = document.getElementById('modal-input-container');
+            const textInput = document.getElementById('modal-input-text');
+
+            if (hideInput) {
+                inputContainer.style.display = 'none';
+            } else {
+                inputContainer.style.display = 'block';
+                textInput.value = defaultValue || "";
+            }
+
+            document.getElementById('custom-modal').style.display = 'flex';
+            document.getElementById('modal-confirm').onclick = () => {
+                const val = textInput.value;
+                closeModal();
+                onConfirm(val);
+            };
+        }
+
+        function closeModal() { document.getElementById('custom-modal').style.display = 'none'; }
+
+        // 修改備註
+        async function handleEditNote(orderId, oldNote) {
+            showModal({
+                title: "修改備註",
+                desc: "請輸入新的備註內容：",
+                defaultValue: oldNote,
+                hideInput: false,
+                onConfirm: async (newNote) => {
+                    await updateOrder({ action: 'updateNote', orderId: orderId, note: newNote });
+                }
+            });
+        }
+
+        // 取消訂位
+        function handleCancel(orderId) {
+            showModal({
+                title: "確認取消訂位",
+                desc: `您確定要取消訂位 ${orderId} 嗎？`,
+                hideInput: true,
+                onConfirm: async () => {
+                    await updateOrder({ action: 'cancelOrder', orderId: orderId });
+                }
+            });
+        }
+
+        // 核心更新函數
+        async function updateOrder(params) {
+            document.getElementById('loading-screen').style.display = 'flex';
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: "POST",
+                    body: JSON.stringify(params)
+                });
+                const res = await response.json().catch(() => ({}));
+
+                if (res.status === "success" || res.result === "success") {
+                    setTimeout(fetchOrders, 800);
+                } else {
+                    setTimeout(fetchOrders, 1000);
+                }
+            } catch (err) {
+                console.warn("Update notice:", err);
+                setTimeout(fetchOrders, 1200);
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

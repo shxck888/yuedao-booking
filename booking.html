@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月島文字燒 - 線上訂位</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="config.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            /* 月島 = 月光 + 鐵板暖意：暖奶油 → 炙燒橘 */
+            background: linear-gradient(135deg, #fff7ed 0%, #fdba74 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            box-shadow: 0 20px 40px rgba(124, 45, 18, 0.12);
+            width: 100%;
+            max-width: 480px;
+            padding: 2.25rem 1.75rem;
+        }
+
+        .input-group {
+            width: 100%;
+            margin-bottom: 1.25rem;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 700;
+            color: #431407;
+            margin-bottom: 0.6rem;
+            font-size: 1.15rem;
+            text-align: center;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            height: 3.8rem;
+            padding: 0 1.1rem;
+            text-align: center;
+            text-align-last: center;
+            border: 1.5px solid #fed7aa;
+            border-radius: 1.25rem;
+            background-color: #fffbf5;
+            transition: all 0.25s ease;
+            outline: none;
+            font-size: 1.2rem;
+            color: #431407;
+            appearance: none;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        textarea {
+            height: auto;
+            min-height: 4.5rem;
+            padding: 1rem 1.1rem;
+            line-height: 1.5;
+        }
+
+        ::placeholder {
+            color: #d6a781;
+            opacity: 1;
+            text-align: center;
+            font-size: 1.05rem;
+        }
+
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23c2410c'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1.1rem center;
+            background-size: 1.2rem;
+            padding-right: 2.5rem;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: #f97316;
+            box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.12);
+            background-color: #fff;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+            color: white;
+            font-weight: 700;
+            padding: 1.15rem;
+            border-radius: 1.25rem;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(194, 65, 12, 0.25);
+            font-size: 1.25rem;
+            margin-top: 1.25rem;
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #d6a781 !important;
+        }
+
+        #custom-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(67, 20, 7, 0.55);
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 2rem;
+            padding: 2.25rem;
+            max-width: 85%;
+            width: 320px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(67, 20, 7, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card">
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-extrabold text-orange-900 tracking-tight">月島文字燒</h2>
+            <p class="text-orange-500 font-bold tracking-[0.3em] text-xs uppercase mt-2">Online Reservation・線上訂位</p>
+        </div>
+
+        <div class="form-content">
+            <div class="input-group">
+                <label for="name">訂位姓名</label>
+                <input type="text" id="name" placeholder="請輸入姓名">
+            </div>
+
+            <div class="input-group">
+                <label for="phone">聯絡電話</label>
+                <input type="tel" id="phone" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="請輸入10位數電話號碼" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+            </div>
+
+            <div class="input-group">
+                <label for="date">預訂日期</label>
+                <input type="date" id="date">
+            </div>
+
+            <div class="input-group">
+                <label for="time">預訂時段</label>
+                <select id="time"></select>
+            </div>
+
+            <div class="input-group">
+                <label for="people">訂位人數</label>
+                <input type="number" id="people" inputmode="numeric" min="1" placeholder="用餐人數">
+            </div>
+
+            <div class="input-group">
+                <label for="note">備註事項 (選填)</label>
+                <textarea id="note" rows="2" placeholder="如有兒童座椅、代烤服務、過敏等特殊需求，請於此註明"></textarea>
+            </div>
+
+            <button id="submitBtn" onclick="submitForm()" class="btn-submit">確認並送出訂位</button>
+        </div>
+    </div>
+
+    <!-- 成功彈窗 -->
+    <div id="custom-modal">
+        <div class="modal-content">
+            <div class="text-orange-500 mb-4 text-5xl">🌙</div>
+            <h3 class="text-2xl font-bold text-orange-900 mb-2">預訂資料已送出</h3>
+            <p class="text-orange-800/70 mb-6 text-base leading-relaxed">感謝您的預訂❤️<br>訂位資訊已成功傳送<br>🍳 我們將盡快為您確認桌次</p>
+            <button id="modalCloseBtn" onclick="closeLiff()" class="bg-orange-900 text-white px-6 py-3 rounded-xl font-bold w-full text-lg shadow-lg active:scale-95 transition-transform">好的</button>
+        </div>
+    </div>
+
+    <script>
+        const MY_LIFF_ID = window.CONFIG.LIFF_ID_BOOKING;
+        const GAS_URL = window.CONFIG.GAS_URL;
+        const STORE_NAME = window.CONFIG.STORE_NAME;
+        let isProcessing = false;
+
+        // 取台灣（GMT+8）目前時間
+        function twNow() {
+            return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+        }
+        function twToday() {
+            const t = twNow();
+            const y = t.getFullYear();
+            const m = String(t.getMonth() + 1).padStart(2, '0');
+            const d = String(t.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        // 用餐時段：11:00~21:30 每半小時，最後加 22:00、22:15
+        function timeSlots() {
+            const slots = [];
+            for (let hour = 11; hour <= 21; hour++) { slots.push([hour, 0], [hour, 30]); }
+            slots.push([22, 0], [22, 15]);
+            return slots;
+        }
+
+        // 依所選日期建立時段；若為今天，隱藏已過的時段
+        function buildTimeOptions() {
+            const timeSelect = document.getElementById('time');
+            const dateVal = document.getElementById('date').value;
+            timeSelect.innerHTML = '';
+            const t = twNow();
+            const isToday = (dateVal === twToday());
+            const curMin = t.getHours() * 60 + t.getMinutes();
+            timeSlots().forEach(([hour, mm]) => {
+                if (isToday && (hour * 60 + mm) <= curMin) return; // 隱藏已過時段
+                const hStr = hour.toString().padStart(2, '0');
+                const mStr = mm.toString().padStart(2, '0');
+                timeSelect.add(new Option(`${hStr}:${mStr}`, `${hStr}:${mStr}`));
+            });
+            if (timeSelect.options.length === 0) {
+                timeSelect.add(new Option('今日已無可預約時段，請改日期', ''));
+            }
+        }
+
+        window.onload = function() {
+            const today = twToday();
+            const dateEl = document.getElementById('date');
+            dateEl.setAttribute('min', today);      // 過去日期無法選
+            dateEl.value = today;
+            dateEl.addEventListener('change', function() {
+                if (dateEl.value && dateEl.value < today) dateEl.value = today; // 防呆：擋過去日期
+                buildTimeOptions();
+            });
+
+            buildTimeOptions();
+
+            liff.init({ liffId: MY_LIFF_ID }).catch(err => console.error("LIFF Init Error", err));
+        };
+
+        async function submitForm() {
+            if (isProcessing) return;
+
+            const name = document.getElementById("name").value.trim();
+            const phone = document.getElementById("phone").value.trim();
+            const date = document.getElementById("date").value;
+            const time = document.getElementById("time").value;
+            const people = document.getElementById("people").value;
+            const note = document.getElementById("note").value.trim() || "無";
+
+            if (!name || !phone || !date || !people) {
+                showToast("請完整填寫資訊");
+                return;
+            }
+
+            if (!/^\d{10}$/.test(phone)) {
+                showToast("電話需為10位數字");
+                return;
+            }
+
+            if (!time) {
+                showToast("請選擇預訂時段");
+                return;
+            }
+
+            isProcessing = true;
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = "正在傳送預訂...";
+
+            let lineId = "Unknown";
+            try {
+                if (liff.isLoggedIn()) {
+                    const profile = await liff.getProfile();
+                    lineId = profile.userId;
+                }
+            } catch(e) {}
+
+            const postData = {
+                name, phone, date, time, people,
+                tables: "", type: "", tableValue: "", // 已移除欄位，送空值保持後端相容
+                note, lineId,
+                store: STORE_NAME, // 額外標記店名（後端若尚未支援會自動忽略）
+                action: "add"
+            };
+
+            fetch(GAS_URL, {
+                method: "POST",
+                mode: 'no-cors',
+                body: JSON.stringify(postData)
+            });
+
+            setTimeout(() => {
+                document.getElementById('custom-modal').style.display = 'flex';
+                btn.innerText = "預訂已送出";
+            }, 800);
+        }
+
+        function showToast(msg) {
+            const btn = document.getElementById('submitBtn');
+            const originalText = "確認並送出訂位";
+            btn.innerText = msg;
+            btn.style.background = "#ef4444";
+            setTimeout(() => {
+                if (!isProcessing) {
+                    btn.innerText = originalText;
+                    btn.style.background = "";
+                }
+            }, 2500);
+        }
+
+        async function closeLiff() {
+            const closeBtn = document.getElementById('modalCloseBtn');
+            closeBtn.innerText = "傳送中...";
+            closeBtn.disabled = true;
+
+            try {
+                // 在關閉前，把剛才填寫的資料抓出來發訊息
+                const name = document.getElementById("name").value;
+                const phone = document.getElementById("phone").value;
+                const date = document.getElementById("date").value;
+                const time = document.getElementById("time").value;
+                const people = document.getElementById("people").value;
+                const noteRaw = document.getElementById("note").value.trim() || "無";
+
+                const confirmMsg = `⛩️ 月島文字燒 訂位確認 ⛩️\n\n・姓名：${name}\n・電話：${phone}\n・日期：${date}\n・時間：${time}\n・人數：${people} 人\n・備註：${noteRaw}`;
+
+                // 檢查是否在 LINE App 內，若是則發送訊息
+                if (liff.isInClient()) {
+                    await liff.sendMessages([
+                        {
+                            type: 'text',
+                            text: confirmMsg
+                        }
+                    ]);
+                }
+            } catch (e) {
+                console.error("發送確認訊息失敗", e);
+            } finally {
+                // 不管發送成功還是失敗，最後都關閉視窗
+                liff.closeWindow();
+            }
+        }
+    </script>
+</body>
+</html>
